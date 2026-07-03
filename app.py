@@ -1,13 +1,8 @@
 import pickle
 import streamlit as st
 import requests
-import pickle
-import zipfile
-
-# Open the zip archive, then open the specific pkl file inside it
-with zipfile.ZipFile('similarity.zip', 'r') as z:
-    with z.open('similarity.pkl', 'r') as f:
-        similarity = pickle.load(f)
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 def fetch_poster(movie_id):
     url = "https://api.themoviedb.org/3/movie/{}?api_key=8265bd1679663a7ea12ac168da84d2e8&language=en-US".format(movie_id)
@@ -36,9 +31,18 @@ def recommend(movie):
     return recommended_movie_names, recommended_movie_posters
 
 
-st.header('Movie Recommender System')
-movies = pickle.load(open('movies.pkl', 'rb'))
+@st.cache_data
+def load_data():
+    movies = pickle.load(open('movies.pkl', 'rb'))
+    # Recompute the similarity matrix from tags instead of loading a
+    # 180MB+ pickle file (GitHub rejects files that large).
+    cv = CountVectorizer(max_features=5000, stop_words='english')
+    vectors = cv.fit_transform(movies['tags']).toarray()
+    similarity = cosine_similarity(vectors)
+    return movies, similarity
 
+st.header('Movie Recommender System')
+movies, similarity = load_data()
 
 movie_list = movies['title'].values
 selected_movie = st.selectbox(
